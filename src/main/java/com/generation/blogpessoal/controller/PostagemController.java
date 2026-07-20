@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.generation.blogpessoal.model.Postagem;
 import com.generation.blogpessoal.repository.PostagemRepository;
+import com.generation.blogpessoal.repository.TemaRepository;
 
 import jakarta.validation.Valid;
 
@@ -30,6 +31,9 @@ public class PostagemController {
 	//Criando um novo objeto de injeção
 	@Autowired
 	private PostagemRepository postagemRepository;
+	
+	@Autowired
+	private TemaRepository temaRepository;
 	
 	@GetMapping
 	public ResponseEntity<List<Postagem>> getAll(){
@@ -50,20 +54,33 @@ public class PostagemController {
 
 	@PostMapping
 	public ResponseEntity<Postagem> post(@Valid @RequestBody Postagem postagem){
-		return ResponseEntity.status(HttpStatus.CREATED)
+		if(temaRepository.existsById(postagem.getTema().getId() )) {
+			postagem.setId(null);//Fazemos isso - porque o front vai eenviar o id 0, mas no spring o BD acha q é consulta
+			
+			return ResponseEntity.status(HttpStatus.CREATED)
 				.body(postagemRepository.save(postagem));
 		// INSERT INTO tb_postagens (titulo, texto) VALUES ({titulo}, {texto});  (SQL) <- Isso é o que o método save() faz, ele insere um novo registro na tabela tb_postagens com os valores informados
-	} //INSERT INTO tb_postagens(titulo,texto) VALUES(?,?)
-	
+	} else {
+		throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O tema não existe!", null);
+	}
+		}//INSERT INTO tb_postagens(titulo,texto) VALUES(?,?)
 	
 	@PutMapping
 	public ResponseEntity<Postagem> put(@Valid @RequestBody Postagem postagem){
-		if(postagemRepository.existsById(postagem.getId()))
-			return ResponseEntity.ok(postagemRepository.save(postagem));
-		//UPDATE tb_postagens SET titulo = ?, texto = ? WHERE id = ?;
-		else
-			return ResponseEntity.notFound().build(); //se não achou ele teria criaod um novo por isso o if
-	} 
+		
+		if(postagemRepository.existsById(postagem.getId())) {
+			
+			if (temaRepository.existsById(postagem.getTema().getId())) {
+				return ResponseEntity.ok(postagemRepository.save(postagem));
+				// UPDATE tb_postagens SET titulo = ?, texto = ? WHERE id = ?;
+			}
+			
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O Tema não existe!", null);
+			
+		}
+		
+		return ResponseEntity.notFound().build();
+	}
 	
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{id}")
